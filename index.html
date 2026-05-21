@@ -1,4 +1,4 @@
-<style>
+ <style>
     /* Import Figtree font */
     @import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&display=swap');
 
@@ -50,7 +50,7 @@
 
 <div class="fixer-container">
     <h3>Side-by-Side Legacy Video Fixer</h3>
-    <div class="last-updated">Last updated: 20 May 2026 by Hollie Herne</div>
+    <div class="last-updated">Last updated: 21 May 2026 by Hollie Herne</div>
     <div class="subtitle">Paste the full block containing <strong>two</strong> broken videos. This tool will extract both and wrap them in a safe, responsive flexbox.</div>
 
     <label for="brokenCode">Paste original problematic HTML block:</label>
@@ -93,7 +93,9 @@
     }
 
     function generateVideoBlockHtml(srcUrl, metaData) {
-        let aspectRatio = "16 / 9";
+        let baseHeight = "30vw";
+        let minH = "220px";
+        let maxH = "315px";
         let iframeClass = "video-embed";
         let ariaLabel = "Video player";
         let iframeTitlePrefix = "Embedded video";
@@ -110,12 +112,14 @@
             iframeClass = "lti-embed";
             ariaLabel = "Echo video player";
             iframeTitlePrefix = "Echo video";
-            aspectRatio = "1.1895"; // Matches the old padding-bottom: 84.065%
+            baseHeight = "32vw"; // Accommodate toolbar
+            minH = "250px";
+            maxH = "350px";
         }
 
         return `
     <div style="flex: 1 1 320px; max-width: 100%;">
-        <div style="width: 100%; overflow: hidden; background: #000000; border-radius: 4px; border: 1px solid #cdcdcd; aspect-ratio: ${aspectRatio};">
+        <div style="width: 100%; height: ${baseHeight}; min-height: ${minH}; max-height: ${maxH}; overflow: hidden; background: #000000; border-radius: 4px; border: 1px solid #cdcdcd;">
             <iframe 
                 class="${iframeClass}" 
                 style="width: 100%; height: 100%; border: none; display: block;" 
@@ -141,15 +145,12 @@
 
         if (!brokenCode) { outputDiv.textContent = 'Please paste a block of code to fix.'; return; }
 
-        // Find ALL iframes in the block
+        // Find ALL iframes in the block and record their start position
         const iframeRegex = /<iframe[^>]*src=["']([^"']+)["'][^>]*>/gi;
         let iframes = [];
         let match;
         while ((match = iframeRegex.exec(brokenCode)) !== null) {
-            // Grab a chunk of surrounding HTML to parse specific metadata for this iframe
-            const startIdx = Math.max(0, match.index - 500);
-            const endIdx = Math.min(brokenCode.length, match.index + 1000);
-            iframes.push({ src: match[1], htmlChunk: brokenCode.substring(startIdx, endIdx) });
+            iframes.push({ src: match[1], index: match.index });
         }
 
         if (iframes.length < 2) {
@@ -157,15 +158,16 @@
             return;
         }
 
-        let combinedHtml = "";
-        
-        // Process exactly 2 videos (if more are pasted, we only take the first two for a 2-column layout)
-        for (let i = 0; i < 2; i++) {
-            let meta = parseMetadata(iframes[i].htmlChunk, iframes[i].src);
-            combinedHtml += generateVideoBlockHtml(iframes[i].src, meta);
-        }
+        // Isolate the HTML chunks so video 1 metadata doesn't bleed into video 2
+        let meta1Chunk = brokenCode.substring(iframes[0].index, iframes[1].index);
+        let meta2Chunk = brokenCode.substring(iframes[1].index);
 
-        const finalOutput = `<div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; width: 100%; margin: 0 auto;">${combinedHtml}\n</div>`;
+        let meta1 = parseMetadata(meta1Chunk, iframes[0].src);
+        let meta2 = parseMetadata(meta2Chunk, iframes[1].src);
+
+        let combinedHtml = generateVideoBlockHtml(iframes[0].src, meta1) + generateVideoBlockHtml(iframes[1].src, meta2);
+
+        const finalOutput = `<div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; width: 100%; margin: 0 auto;">\n${combinedHtml}\n</div>`;
 
         statusDiv.textContent = `✓ Successfully extracted 2 videos. Canvas-safe Flexbox applied.`;
         outputDiv.textContent = finalOutput;
