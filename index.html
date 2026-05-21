@@ -72,13 +72,11 @@
     function parseMetadata(htmlBlock, fallbackSrc) {
         let title = "Video Resource", source = "UC", year = "2026", permalink = fallbackSrc;
 
-        // Try extracting from anchor tag first
         const anchorMatch = htmlBlock.match(/>Source:\s*<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i);
         if (anchorMatch) {
             permalink = anchorMatch[1];
             title = anchorMatch[2].trim();
         } else {
-            // Fallback to iframe title
             const titleMatch = htmlBlock.match(/title=["'](?:Echo video:|YouTube video:)?\s*(.*?)["']/i);
             if (titleMatch) title = titleMatch[1].trim();
         }
@@ -93,7 +91,7 @@
     }
 
     function generateVideoBlockHtml(srcUrl, metaData) {
-        let aspectRatio = "16 / 9";
+        let paddingBottom = "56.25%";
         let iframeClass = "video-embed";
         let ariaLabel = "Video player";
         let iframeTitlePrefix = "Embedded video";
@@ -110,15 +108,16 @@
             iframeClass = "lti-embed";
             ariaLabel = "Echo video player";
             iframeTitlePrefix = "Echo video";
-            aspectRatio = "1 / 0.84065"; // Matches the old padding-bottom: 84.065% perfectly
+            paddingBottom = "84.065%"; // Matches the old padding perfectly
         }
 
         return `
     <div style="flex: 1 1 320px; max-width: 100%;">
-        <div style="width: 100%; aspect-ratio: ${aspectRatio}; overflow: hidden; background: #000000; border-radius: 4px; border: 1px solid #cdcdcd;">
+        <div style="display: grid; width: 100%; overflow: hidden; background: #000000; border-radius: 4px; border: 1px solid #cdcdcd;">
+            <div style="grid-area: 1 / 1; width: 100%; padding-bottom: ${paddingBottom};"></div>
             <iframe 
                 class="${iframeClass}" 
-                style="width: 100%; height: 100%; border: none; display: block;" 
+                style="grid-area: 1 / 1; width: 100%; height: 100%; border: none; display: block;" 
                 title="${iframeTitlePrefix}: ${metaData.title}" 
                 src="${srcUrl}" 
                 loading="lazy" 
@@ -141,7 +140,6 @@
 
         if (!brokenCode) { outputDiv.textContent = 'Please paste a block of code to fix.'; return; }
 
-        // Find ALL iframes in the block and record their start position
         const iframeRegex = /<iframe[^>]*src=["']([^"']+)["'][^>]*>/gi;
         let iframes = [];
         let match;
@@ -154,7 +152,6 @@
             return;
         }
 
-        // Isolate the HTML chunks so video 1 metadata doesn't bleed into video 2
         let meta1Chunk = brokenCode.substring(iframes[0].index, iframes[1].index);
         let meta2Chunk = brokenCode.substring(iframes[1].index);
 
@@ -165,7 +162,7 @@
 
         const finalOutput = `<div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; width: 100%; margin: 0 auto;">\n${combinedHtml}\n</div>`;
 
-        statusDiv.textContent = `✓ Successfully extracted 2 videos. Canvas-safe Flexbox applied.`;
+        statusDiv.textContent = `✓ Successfully extracted 2 videos. Canvas-safe Grid/Flexbox layout applied.`;
         outputDiv.textContent = finalOutput;
         copyBtn.style.display = 'block';
     }
