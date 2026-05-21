@@ -1,0 +1,209 @@
+<style>
+    /* Import Figtree font */
+    @import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&display=swap');
+
+    .fixer-container {
+        max-width: 650px;
+        margin: 20px auto;
+        padding: 20px;
+        border: 1px solid #760029;
+        border-radius: 8px;
+        font-family: 'Figtree', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        color: #414042;
+        background-color: #fff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .fixer-container h3 { margin-top: 0; margin-bottom: 5px; color: #414042; }
+    .fixer-container .last-updated {
+        font-size: 0.85em; color: #760029; background-color: #f8e6eb;
+        padding: 4px 8px; border-radius: 4px; display: inline-block;
+        margin-bottom: 15px; border: 1px solid #e1bac5; font-weight: 600;
+    }
+    .fixer-container .subtitle { font-size: 0.9em; color: #666; margin-bottom: 15px; }
+    .fixer-container label { display: block; margin-top: 15px; font-weight: bold; }
+    .fixer-container textarea {
+        width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ddd;
+        border-radius: 4px; box-sizing: border-box; font-family: monospace;
+        font-size: 0.9em; color: inherit; background-color: #fafafa;
+    }
+    .fixer-container .button-group { display: flex; gap: 10px; margin-top: 20px; margin-bottom: 20px; }
+    .fixer-container button {
+        background-color: #760029; color: white; padding: 12px 15px; border: none;
+        border-radius: 4px; cursor: pointer; font-size: 1em; font-family: inherit;
+        font-weight: 600; transition: background-color 0.2s ease; flex-grow: 1;
+    }
+    .fixer-container button:hover { background-color: #52001D; }
+    #resetBtn { background-color: #A9A9A9; }
+    #resetBtn:hover { background-color: #808080; }
+    #fixedCodeOutput {
+        background-color: #f4f4f4; border: 1px solid #ddd; padding: 15px;
+        margin-top: 5px; white-space: pre-wrap; word-break: break-all;
+        min-height: 60px; font-family: monospace; color: #333; border-radius: 4px;
+    }
+    #copyFixedBtn {
+        padding: 10px 12px; font-size: 0.95em; margin-top: 10px; background-color: #760029; 
+        transition: background-color 0.2s ease; display: block; width: 100%; box-sizing: border-box;
+    }
+    #copyFixedBtn:hover { background-color: #52001D; }
+    .status-msg { margin-top: 10px; font-size: 0.9em; font-weight: bold; color: #760029; }
+</style>
+
+<div class="fixer-container">
+    <h3>Side-by-Side Legacy Video Fixer</h3>
+    <div class="last-updated">Last updated: 20 May 2026 by Hollie Herne</div>
+    <div class="subtitle">Paste the full block containing <strong>two</strong> broken videos. This tool will extract both and wrap them in a safe, responsive flexbox.</div>
+
+    <label for="brokenCode">Paste original problematic HTML block:</label>
+    <textarea id="brokenCode" rows="8" placeholder="Please paste the entire block encompassing both video divs and their source paragraphs..."></textarea>
+
+    <div class="button-group">
+        <button onclick="fixSideBySideCode()">Convert & fix code</button>
+        <button id="resetBtn" onclick="resetFixer()">Reset</button>
+    </div>
+
+    <div id="extractionStatus" class="status-msg"></div>
+
+    <label for="fixedCodeOutput">Updated RCE sanitizer-proof code:</label>
+    <div id="fixedCodeOutput"></div>
+    <button id="copyFixedBtn" onclick="copyFixedCode()" style="display: none;">Copy converted code to clipboard</button>
+</div>
+
+<script>
+    function parseMetadata(htmlBlock, fallbackSrc) {
+        let title = "Video Resource", source = "UC", year = "2026", permalink = fallbackSrc;
+
+        // Try extracting from anchor tag first
+        const anchorMatch = htmlBlock.match(/>Source:\s*<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i);
+        if (anchorMatch) {
+            permalink = anchorMatch[1];
+            title = anchorMatch[2].trim();
+        } else {
+            // Fallback to iframe title
+            const titleMatch = htmlBlock.match(/title=["'](?:Echo video:|YouTube video:)?\s*(.*?)["']/i);
+            if (titleMatch) title = titleMatch[1].trim();
+        }
+
+        const metaMatch = htmlBlock.match(/\(\s*([^,)]+)\s*,\s*([^)]+)\s*\)/);
+        if (metaMatch) {
+            if (metaMatch[1]) source = metaMatch[1].trim();
+            if (metaMatch[2]) year = metaMatch[2].trim();
+        }
+
+        return { title, source, year, permalink };
+    }
+
+    function generateVideoBlockHtml(srcUrl, metaData) {
+        let aspectRatio = "16 / 9";
+        let iframeClass = "video-embed";
+        let ariaLabel = "Video player";
+        let iframeTitlePrefix = "Embedded video";
+        let iframeAllow = "autoplay; encrypted-media; picture-in-picture; fullscreen";
+        let finalPermalink = metaData.permalink;
+
+        if (srcUrl.includes('youtube.com') || srcUrl.includes('youtu.be')) {
+            ariaLabel = "YouTube video player";
+            iframeTitlePrefix = "YouTube video";
+            iframeAllow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen";
+            const ytMatch = srcUrl.match(/(?:embed\/|v=|v\/|youtu\.be\/|\/v\/)([a-zA-Z0-9_-]{11})/i);
+            if (ytMatch) finalPermalink = `https://www.youtube.com/watch?v=${ytMatch[1]}`;
+        } else if (srcUrl.includes('external_tools/retrieve') || srcUrl.includes('echo360.net.au')) {
+            iframeClass = "lti-embed";
+            ariaLabel = "Echo video player";
+            iframeTitlePrefix = "Echo video";
+            aspectRatio = "1.1895"; // Matches the old padding-bottom: 84.065%
+        }
+
+        return `
+    <div style="flex: 1 1 320px; max-width: 100%;">
+        <div style="width: 100%; overflow: hidden; background: #000000; border-radius: 4px; border: 1px solid #cdcdcd; aspect-ratio: ${aspectRatio};">
+            <iframe 
+                class="${iframeClass}" 
+                style="width: 100%; height: 100%; border: none; display: block;" 
+                title="${iframeTitlePrefix}: ${metaData.title}" 
+                src="${srcUrl}" 
+                loading="lazy" 
+                allowfullscreen="allowfullscreen" 
+                allow="${iframeAllow}" 
+                aria-label="${ariaLabel}">
+            </iframe>
+        </div>
+        <p style="text-align: center; margin-top: 12px; margin-bottom: 0;">Source: <a class="inline_disabled" href="${finalPermalink}" target="_blank" rel="noopener">${metaData.title}</a> (${metaData.source}, ${metaData.year})</p>
+    </div>`;
+    }
+
+    function fixSideBySideCode() {
+        const brokenCode = document.getElementById('brokenCode').value.trim();
+        const outputDiv = document.getElementById('fixedCodeOutput');
+        const statusDiv = document.getElementById('extractionStatus');
+        const copyBtn = document.getElementById('copyFixedBtn');
+
+        statusDiv.textContent = ""; outputDiv.textContent = ""; copyBtn.style.display = 'none';
+
+        if (!brokenCode) { outputDiv.textContent = 'Please paste a block of code to fix.'; return; }
+
+        // Find ALL iframes in the block
+        const iframeRegex = /<iframe[^>]*src=["']([^"']+)["'][^>]*>/gi;
+        let iframes = [];
+        let match;
+        while ((match = iframeRegex.exec(brokenCode)) !== null) {
+            // Grab a chunk of surrounding HTML to parse specific metadata for this iframe
+            const startIdx = Math.max(0, match.index - 500);
+            const endIdx = Math.min(brokenCode.length, match.index + 1000);
+            iframes.push({ src: match[1], htmlChunk: brokenCode.substring(startIdx, endIdx) });
+        }
+
+        if (iframes.length < 2) {
+            outputDiv.textContent = 'Error: Found less than 2 videos in the provided code. Please use the standard single-video fixer tool instead.';
+            return;
+        }
+
+        let combinedHtml = "";
+        
+        // Process exactly 2 videos (if more are pasted, we only take the first two for a 2-column layout)
+        for (let i = 0; i < 2; i++) {
+            let meta = parseMetadata(iframes[i].htmlChunk, iframes[i].src);
+            combinedHtml += generateVideoBlockHtml(iframes[i].src, meta);
+        }
+
+        const finalOutput = `<div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; width: 100%; margin: 0 auto;">${combinedHtml}\n</div>`;
+
+        statusDiv.textContent = `✓ Successfully extracted 2 videos. Canvas-safe Flexbox applied.`;
+        outputDiv.textContent = finalOutput;
+        copyBtn.style.display = 'block';
+    }
+
+    function copyFixedCode() {
+        const code = document.getElementById('fixedCodeOutput').textContent;
+        const btn = document.getElementById('copyFixedBtn');
+        if (!code || code.includes('Please paste') || code.includes('Error:')) return;
+
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(code).then(() => showSuccess(btn)).catch(() => fallbackCopy(code, btn));
+        } else {
+            fallbackCopy(code, btn);
+        }
+    }
+
+    function fallbackCopy(text, btn) {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        try { document.execCommand('copy') ? showSuccess(btn) : alert('Manual copy required.'); } 
+        catch (e) { alert('Manual copy required.'); }
+        document.body.removeChild(ta);
+    }
+
+    function showSuccess(btn) {
+        btn.textContent = 'Copied Code Successfully!';
+        setTimeout(() => btn.textContent = 'Copy converted code to clipboard', 2000);
+    }
+
+    function resetFixer() {
+        document.getElementById('brokenCode').value = '';
+        document.getElementById('fixedCodeOutput').textContent = '';
+        document.getElementById('extractionStatus').textContent = '';
+        document.getElementById('copyFixedBtn').style.display = 'none';
+    }
+</script>
